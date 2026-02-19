@@ -1,0 +1,83 @@
+################### Experiment information ######################
+description: end-to-end version of the XprotoNet-based model
+run_name: "ProtoFPNet_Video_EchoPrime"
+agent: "Video_XProtoNet_e2e"
+wandb_mode: 'online'  # one of "online", "offline" or "disabled". disabled turns wandb logging off! good for testing
+abstain_class: False
+
+################## Model information ##########################
+model: &model
+  checkpoint_path: ''
+  name: "ProtoFPNet_Video_EchoPrime"
+  feat_shape: (8, 14, 14)
+  feat_channels: 384
+  prototype_shape: (20, 256, 1, 1, 1)  # Modify first element to select total # of prototypes (dividable by num_classes)
+  num_classes: 2
+################## Training information ##########################
+train: &train
+  seed: 200
+  num_train_epochs: 31
+  save: True
+  save_step: null
+  num_warm_epochs: 0
+  batch_size: 32
+  accumulation_steps: 8
+  push_start: 10
+  push_rate: 5 # epochs
+  num_workers: 16
+
+  criterion:
+    CeLoss:  # will be used if (abstain_class == False)
+      loss_weight: 1
+      reduction: 'mean'
+    CeLossAbstain:  # will be used if (abstain_class == True)
+        loss_weight: 1
+        ab_weight: 0.3
+        ab_logitpath: 'joined'
+        reduction: 'mean'
+    ClusterRoiFeat:
+      loss_weight: 0.8
+      reduction: 'mean'
+    SeparationRoiFeat:
+      loss_weight: 0.08
+      reduction: 'mean'
+    OrthogonalityLoss:
+      loss_weight: 0.01
+      mode: 'per_class'  # to encourage diversity in each class ('per_class'), or overal ('all')
+    Lnorm_occurrence:
+      p: 2
+      loss_weight: 0.0001 # 1e-4
+      reduction: 'mean'
+    trans_occurrence:
+      loss_weight: 0.001 # 1e-4
+      reduction: 'mean'
+    Lnorm_FC:
+      p: 1
+      loss_weight: 0.0001 # 1e-4
+
+  optimizer: &optimizer
+    name: 'Adam'
+    mode: 'lr_same'  # can be lr_same/lr_disjoint
+    lr_same: 0.0001  # 1e-4
+
+  lr_schedule: &lr_schedule   # for joint_optimizer only
+    name: 'ReduceLROnPlateau'
+    mode: 'max'  # used for F1 score
+    factor: 0.5  # Factor by which the learning rate will be reduced
+    patience: 5 # Number of epochs with no improvement after which learning rate will be reduced
+    threshold: 0.0001  # Threshold for measuring the new optimum, to only focus on significant changes
+    cooldown: 2
+    min_lr: 0.000001  # 1e-6
+    #verbose: True
+#################### Data information #######################
+data: &data   #TODO modify this according to your dataset class and dataloder needs
+  data_info_file: 'data/view3_exams_patients_with_lvfp_doppler.csv'
+  embeddings_path: 'data/patch_embeddings.npy'
+  random_seed: 42
+  num_frames: 32
+  frame_stride: 2
+  val_size: 0.15
+  test_size: 0.15
+  img_size: 224
+
+    
