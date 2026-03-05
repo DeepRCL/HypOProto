@@ -21,7 +21,7 @@ class Video_XProtoNet_EchoPrime(PPNet):
         self.prototype_class_identity = self.get_prototype_class_identity()
         self.proto_layer_rf_info = proto_layer_rf_info
 
-        self.proj = nn.Linear(4096, feat_channels)
+        #self.proj = nn.Linear(4096, feat_channels)
         self.spatial_size = 14
         self.embed_dim = feat_channels
 

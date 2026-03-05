@@ -40,15 +40,15 @@ class ProtoPNet_Base(BaseAgent):
         super().__init__(config)
 
         # ############# define dataset and dataloader ##########
-        if "dino" in config['run_name'].lower():
-            train_loader, _, _ = create_dino_dataloaders(config)  # Get train, ignore val/test
-            self.data_loaders.update({"train_push": train_loader})
-        elif self.model_config["name"] == "ProtoFPNet_Video_EchoPrime" or self.model_config["name"] == "Hyper_ProtoFPNet_Video_EchoPrime":
-            train_loader, _, _ = create_echoprime_dataloaders(config)  # Get train, ignore val/test
-            self.data_loaders.update({"train_push": train_loader})
-        else:
-            train_loader, _, _ = create_video_dataloaders(config)  # Get train, ignore val/test
-            self.data_loaders.update({"train_push": train_loader})
+        # if "dino" in config['run_name'].lower():
+        #     train_loader, _, _ = create_dino_dataloaders(config)  # Get train, ignore val/test
+        #     self.data_loaders.update({"train_push": train_loader})
+        # elif self.model_config["name"] == "ProtoFPNet_Video_EchoPrime" or self.model_config["name"] == "Hyper_ProtoFPNet_Video_EchoPrime":
+        #     train_loader, _, _ = create_echoprime_dataloaders(config)  # Get train, ignore val/test
+        #     self.data_loaders.update({"train_push": train_loader})
+        # else:
+        #     train_loader, _, _ = create_video_dataloaders(config)  # Get train, ignore val/test
+        #     self.data_loaders.update({"train_push": train_loader})
 
         # #################### define loss  ###################
         self.get_criterion()

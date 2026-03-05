@@ -10,6 +10,7 @@ import wandb
 import logging
 
 import torch
+import torch.nn as nn
 from torch.backends import cudnn
 from torchsummary import summary
 
@@ -21,6 +22,7 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     f1_score,
 )
+from sklearn.model_selection import train_test_split 
 
 from src.loss.loss import (
     MAE,
@@ -30,7 +32,7 @@ from src.utils.lorentz import elementwise_dist
 from src.agents.XProtoNet_e2e import XProtoNet_e2e
 from src.data.dataloader import class_labels
 from src.utils.utils import makedir
-from src.utils.vis_prot_embd_space import plot_distance_histogram, plot_radius_vs_root_distance
+from src.utils.vis_prot_embd_space import plot_distance_histogram, plot_radius_vs_root_distance, plot_hyperboloid_projection, plot_radius_vs_root_distance_with_videos, plot_combined_hyperboloid_projection
 
 cudnn.benchmark = True  # IF input size is same all the time, it's faster this way
 
@@ -40,6 +42,137 @@ class Hyper_Video_XProtoNet_e2e(XProtoNet_e2e):
         super().__init__(config)
         self.MAELoss = MAE(**config['train']['criterion']["MAE"])
         self.HyperPASLoss = HyperbolicAngularSeparationLoss(**config['train']['criterion']["HyperPAS"])
+
+                # DFR setup
+        self.use_dfr = config.get('dfr', {}).get('use_dfr', False)
+        if self.use_dfr:
+            self.dfr_num_epochs = config['dfr']['num_epochs']
+            self.dfr_lr = config['dfr']['lr']
+            self.dfr_balanced_fraction = config['dfr'].get('balanced_fraction', 0.25)  # 10% balanced
+            self.dfr_head = None
+            print("DFR enabled - will retrain head on balanced val subset")
+
+    def setup_dfr_head(self, feat_dim, num_classes):
+        """Initialize DFR linear head with normalization"""
+        self.dfr_head = nn.Sequential(
+            nn.LayerNorm(feat_dim),  # Normalize features
+            nn.Linear(feat_dim, num_classes)
+        ).to(self.device)
+        return torch.optim.Adam(self.dfr_head.parameters(), lr=self.dfr_lr), nn.CrossEntropyLoss()
+
+    def extract_features_for_dfr(self, dataloader, mode="val"):
+        """Extract frozen features (similarities) for DFR"""
+        self.model.eval()
+        self.model.requires_grad_(False)  # Freeze all
+        
+        feats, labels = [], []
+        with torch.no_grad():
+            for data_sample in tqdm(dataloader, desc=f"Extracting {mode} feats"):
+                input = data_sample["video"].to(self.device)
+                target = data_sample["label"].squeeze(-1).long().cpu()
+                
+                _, similarities, _, _ = self.model(input)  # Use similarities as feats (P-dim)
+                feats.append(similarities.detach().cpu())
+                labels.append(target)
+        
+        return torch.cat(feats), torch.cat(labels)
+
+    def prepare_balanced_dfr_data(self, feats, labels, stratify_col=None):
+        """Create balanced subset by class/view/E/e' bins"""
+        # Simple class-balanced split (extend with views/ee if available)
+        train_idx, val_idx = train_test_split(
+            range(len(feats)), 
+            test_size=1-self.dfr_balanced_fraction, 
+            stratify=labels,  # Balance by class
+            random_state=42
+        )
+        return feats[train_idx], labels[train_idx]
+
+    def dfr_retrain(self):
+        """Full DFR retraining on balanced val subset"""
+        if not self.use_dfr or self.dfr_head is not None:
+            return
+            
+        # Extract feats from val
+        feats, labels = self.extract_features_for_dfr(self.data_loaders['val'])
+        phi_bal, y_bal = self.prepare_balanced_dfr_data(feats, labels)
+        
+        logging.info(f"DFR: Using {len(phi_bal)} balanced samples (from {len(feats)} total)")
+        
+        # Setup & train head
+        opt, criterion = self.setup_dfr_head(phi_bal.shape[1], self.model.num_classes)
+        phi_bal_t = phi_bal.to(self.device)
+        y_bal_t = y_bal.to(self.device)
+        
+        for epoch in range(self.dfr_num_epochs):
+            logits = self.dfr_head(phi_bal_t)
+            loss = criterion(logits, y_bal_t)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            if epoch % 10 == 0:
+                logging.info(f"DFR epoch {epoch}: loss={loss.item():.4f}")
+        
+        self.model.requires_grad_(True)  # Unfreeze for normal training
+        logging.info("DFR head trained & ready")
+
+    def forward_with_dfr(self, similarities):
+        """Use DFR head if active, else original logits"""
+        if self.use_dfr and self.dfr_head is not None:
+            return self.dfr_head(similarities)  # DFR logits
+        # Original: model.last_layer(similarities)
+        return self.model.last_layer(similarities)
+
+    def apply_dfr_from_checkpoint(self, checkpoint_path, val_mode='val'):
+        """
+        Load pretrained model, extract val features, train DFR head.
+        
+        Usage:
+        agent = Hyper_Video_XProtoNet_e2e(config)
+        agent.load_model(checkpoint_path)  # Your existing load
+        agent.apply_dfr_from_checkpoint(checkpoint_path)
+        agent.save_model('model_with_dfr.pth')  # Save with DFR head
+        """
+        logging.info(f"Loading pretrained model from {checkpoint_path} for DFR")
+        
+        # Load your pretrained checkpoint (assumes existing load_model method)
+        self.load_checkpoint(checkpoint_path)
+        
+        # Extract features & prepare balanced data
+        feats, labels = self.extract_features_for_dfr(self.data_loaders[val_mode])
+        phi_bal, y_bal = self.prepare_balanced_dfr_data(feats, labels)
+        
+        logging.info(f"DFR: Balanced subset {len(phi_bal)}/{len(feats)} samples")
+        
+        # Train DFR head
+        opt, criterion = self.setup_dfr_head(phi_bal.shape[1], self.model.num_classes)
+        phi_bal_t = phi_bal.to(self.device)
+        y_bal_t = y_bal.to(self.device)
+        
+        self.model.eval()
+        for epoch in tqdm(range(self.dfr_num_epochs), desc="DFR Retrain"):
+            logits = self.dfr_head(phi_bal_t)
+            loss = criterion(logits, y_bal_t)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            if epoch % 10 == 0:
+                logging.info(f"DFR e{epoch}: loss={loss.item():.4f}")
+        
+        # Test DFR on full val
+        self.model.eval()
+        full_logits = self.dfr_head(feats.to(self.device))
+        full_acc = balanced_accuracy_score(labels.cpu(), full_logits.argmax(1).cpu())
+        logging.info(f"DFR val acc: {full_acc:.3f}")
+        
+        logging.info("✅ DFR head ready! Use forward_with_dfr() in inference")
+    
+    def save_model(self, model_dir, model_name):
+        state = self.get_state()
+        torch.save(
+            state,
+            f=os.path.join(model_dir, (model_name)),
+        )
 
     def run_epoch(self, epoch, optimizer=None, mode="train"):
         logging.info(f"Epoch: {epoch} starting {mode}")
@@ -77,6 +210,15 @@ class Hyper_Video_XProtoNet_e2e(XProtoNet_e2e):
         # Reset sparsity metric
         getattr(self, f"{mode}_sparsity_80").reset()
 
+        # Add this: Accumulate test ee for prototypes (only for test_vis)
+        if mode == "test":
+            # NEW: Collect test ee + proto assignments for test_vis scatter plot
+            test_video_root_dists = []
+            test_ee_list = []
+            test_pred_ee_list = []
+            video_ee_closest = [[] for _ in range(self.model.prototype_shape[0])]
+            video_distances_closest = [[] for _ in range(self.model.prototype_shape[0])]
+
         with torch.set_grad_enabled(mode == "train"):
             data_iter = iter(data_loader)
             iterator = tqdm(range(len(data_loader)), dynamic_ncols=True)
@@ -91,6 +233,10 @@ class Hyper_Video_XProtoNet_e2e(XProtoNet_e2e):
                 ee = data_sample["average_e_e_ratio"].to(self.device)
 
                 logit, similarities, occurrence_map, pred_ee = self.model(input)
+
+                # ADD THIS LINE (key fix!)
+                if self.use_dfr and self.dfr_head is not None and mode != "train":
+                    logit = self.forward_with_dfr(similarities)
 
                 ############ Compute Loss ###############
                 # CrossEntropy loss for Multiclass data
@@ -197,6 +343,51 @@ class Hyper_Video_XProtoNet_e2e(XProtoNet_e2e):
 
                 simscore_cumsum += similarities.sum(dim=0).detach().cpu()
 
+                # NEW: Accumulate test ee stats (inside loop, after valid_mask)
+                if mode == "test" and valid_mask.any():
+                    # Compute root distance for each VALID video's feature (not prototype!)
+                    video_features, similarities = self.model.get_hyper_video_features(input)  # (B, D) - adapt to your feature extractor
+                    # For VALID samples only
+                    valid_sim = similarities[valid_mask]      # (B_valid, 20)
+                    valid_feats = video_features[valid_mask]  # (B_valid, 20, 256)
+                    
+                    # Get top-1 prototype index per video
+                    top_proto_idx = valid_sim.argmax(dim=1)   # (B_valid,)
+                    
+                    # Index features: video_features[b, top_proto_idx[b], :] → (B_valid, 256)
+                    top_video_feats = valid_feats[range(len(valid_feats)), top_proto_idx]  # Fancy indexing!
+                    batch_video_root_dists = elementwise_dist(
+                        torch.zeros((1, top_video_feats.shape[1]), device=self.device), 
+                        top_video_feats, 
+                        self.model.curv.exp()
+                    ).cpu().numpy()
+                    test_video_root_dists.extend(batch_video_root_dists)
+                    test_ee_list.extend(ee[valid_mask].cpu().numpy())
+                    test_pred_ee_list.extend(pred_ee_valid.cpu().numpy())
+
+                     # NEW: Top-10 closest videos PER prototype
+                    valid_ee_np = ee[valid_mask].cpu().numpy()
+                    
+                    for b in range(len(valid_ee_np)):  # Per valid video
+                        proto_id = top_proto_idx[b].item()
+                        batch_ee = valid_ee_np[b]
+                        if not np.isnan(batch_ee):
+                            # Add to top-10 for this proto (truncate to 10)
+                            video_ee_closest[proto_id].append(batch_ee)
+                            # Compute distance for this video-proto pair
+                            video_feat = top_video_feats[b:b+1]  # (1, 256)
+                            vid_dist = elementwise_dist(
+                                torch.zeros((1, video_feat.shape[1]), device=self.device), 
+                                video_feat, 
+                                self.model.curv.exp()
+                            ).cpu().numpy()[0]
+                            video_distances_closest[proto_id].append(vid_dist)
+                            # FIXED: Convert to lists after truncation (not tuples!)
+                            combined = sorted(zip(video_ee_closest[proto_id], video_distances_closest[proto_id]), 
+                                            key=lambda x: x[1])[:10]
+                            video_ee_closest[proto_id] = [x[0] for x in combined]
+                            video_distances_closest[proto_id] = [x[1] for x in combined]
+
                 # ########################## Logging batch information on console ###############################
                 # cm_flattened = [list(cm[j].flatten()) for j in range(cm.shape[0])]
                 iterator.set_description(
@@ -295,6 +486,7 @@ class Hyper_Video_XProtoNet_e2e(XProtoNet_e2e):
         total_loss /= n_batches
 
         cm = confusion_matrix(y_true_all, y_pred_class_all, labels=range(len(label_names)))
+        print(cm)
 
         ################################
         # get distribution of distances between prototypes and root (root is 0)
@@ -318,6 +510,38 @@ class Hyper_Video_XProtoNet_e2e(XProtoNet_e2e):
             fig_dist_vs_ee = plot_radius_vs_root_distance(root_distances, prototype_ee,
                                                        "Distance to Origin", epoch, self.config["save_dir"],
                                                        f"{mode}-ee-vs-distance")
+        elif mode == "test":
+            # Plot all video samples (ee vs their own root distance)
+            # fig_dist_vs_ee = plot_hyperboloid_projection(
+            #     np.array(test_pred_ee_list),
+            #     np.array(test_ee_list),
+            #     np.array(test_video_root_dists), 
+            #     "Distance to Origin", 
+            #     epoch, 
+            #     self.config["save_dir"],
+            #     f"{mode}-video-rootdist-vs-ee-hyper-all-0.5"
+            # )
+
+            fig_dist_vs_ee = plot_combined_hyperboloid_projection(
+                np.array(test_pred_ee_list), 
+                np.array(test_ee_list), 
+                np.array(test_video_root_dists),
+                root_distances, 
+                prototype_ee,
+                "Hyperboloid Projection: Videos + Prototypes", 
+                epoch, self.config["save_dir"],
+                f"{mode}-video-rootdist-vs-ee-hyper-proto")
+
+
+            # # NEW: Prototypes + closest videos
+            # plot_radius_vs_root_distance_with_videos(
+            #     root_distances, prototype_ee,
+            #     video_ee_closest, video_distances_closest,
+            #     "Prototypes + 10 Closest Videos", epoch, self.config["save_dir"],
+            #     f"{mode}-radius_vs_root_with_videos"
+            # )
+
+    
 
         # Diversity Metric Calculations
         # count how many prototypes were activated in at least 1% of the samples

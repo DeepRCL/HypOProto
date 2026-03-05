@@ -16,16 +16,16 @@ model: &model
   lift_prototypes: True
 ################## Training information ##########################
 train: &train
-  seed: 200
+  seed: 13
   num_train_epochs: 31
   save: True
   save_step: null
   num_warm_epochs: 0
-  batch_size: 64
-  accumulation_steps: 4
+  batch_size: 32
+  accumulation_steps: 6
   push_start: 10
   push_rate: 5 # epochs
-  num_workers: 16
+  num_workers: 4
 
   criterion:
     CeLoss:  # will be used if (abstain_class == False)
@@ -43,11 +43,11 @@ train: &train
       loss_weight: 0.08
       reduction: 'mean'
     OrthogonalityLoss:
-      loss_weight: 0.01
+      loss_weight: 0
       mode: 'per_class'  # to encourage diversity in each class ('per_class'), or overal ('all')
     Lnorm_occurrence:
       p: 2
-      loss_weight: 0.0001 # 1e-4
+      loss_weight: 0.001 # 1e-4
       reduction: 'mean'
     trans_occurrence:
       loss_weight: 0.001 # 1e-4
@@ -59,14 +59,14 @@ train: &train
       loss_weight: 0.2
       reduction: 'mean'
     HyperPAS:
-      loss_weight: 0.5
+      loss_weight: 0.1
       temperature: 0.1
 
   optimizer: &optimizer
     name: 'Adam'
     mode: 'lr_ee'  # can be lr_same/lr_disjoint/lr_ee
     lr_same: 0.0001  # 1e-4
-    lr_ee: 0.001 # 1e-3
+    lr_ee: 0.0005 # 1e-3
     #lr_prototype_vectors: 0.001 #1e-3
 
   lr_schedule: &lr_schedule   # for joint_optimizer only
@@ -81,7 +81,7 @@ train: &train
 #################### Data information #######################
 data: &data   #TODO modify this according to your dataset class and dataloder needs
   data_info_file: 'data/view3_exams_patients_with_lvfp_doppler.csv'
-  embeddings_path: '/data/project/users/victoriawu/dinov3/pca_embeddings_512/'
+  embeddings_root: '/data/project/users/victoriawu/dinov3/individual_512/'
   random_seed: 42
   num_frames: 32
   frame_stride: 1
@@ -89,4 +89,16 @@ data: &data   #TODO modify this according to your dataset class and dataloder ne
   test_size: 0.15
   img_size: 224
 
-    
+################### DFR Configuration ######################
+dfr:
+  use_dfr: false  # Auto-DFR during training (first val epoch)
+  num_epochs: 50
+  lr: 0.001
+  balanced_fraction: 0.2  # 10% class-balanced subset
+
+# DFR-only mode (standalone)
+dfr_only: false
+#pretrained_checkpoint: "/home/victoriawu/workspace/ProtoASNet/logs/Hyper_PCA_Dino_512_00/20push_f1-0.7502.pth"  # Required for dfr_only/eval_dfr_only
+
+# Eval DFR mode
+eval_dfr_only: false

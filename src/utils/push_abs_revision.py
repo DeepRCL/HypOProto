@@ -356,7 +356,7 @@ def push_prototypes(
                 #ee_mask = np.isfinite(ee_values)                  # numpy bool (B,)
                 
                 # NEW: Delta-qualified EE mask
-                delta = 5.0 # TODO make this config
+                delta = 2.0 # TODO make this config
                 proto_ee = proto_ee_values[j]  # Learned value for proto j (scalar)
                 ee_mask = np.abs(ee_values - proto_ee) <= delta
                 

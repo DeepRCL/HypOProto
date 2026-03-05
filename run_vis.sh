@@ -1,13 +1,14 @@
 #!/bin/bash
 
-#SBATCH --job-name=LVFP_Vis
-#SBATCH --time=1:00:00
+#SBATCH --job-name=LVFP
+#SBATCH --time=2:00:00
 #SBATCH --nodes=1                               # Number of nodes
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=17                       # CPU cores per MPI process
-#SBATCH --mem=180GB                                 # memory per node! 0 requests all
-#SBATCH --gpus-per-node=1                       # number of GPUs per node
-#SBATCH --output=Vis_%A_%a.out
+#SBATCH --cpus-per-task=17                      # CPU cores per MPI process
+#SBATCH --mem=200G                               # memory per node!  4 GB per GPU
+#SBATCH --gres=gpu:b200_2g.45gb:1            # for full, gpu:b200_full:1,  for  45gb gpu:b200_2g.45gb:1,  for 23gb gpu:b200_1g.23gb:1
+#SBATCH --output=Vis.out
+#SBATCH --partition=mig
 
 ################################################################################
 

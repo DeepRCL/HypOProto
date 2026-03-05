@@ -221,10 +221,10 @@ def test_dataloader(embeddings_dir, metadata_csv=None, batch_size=16, num_worker
     return train_loader, val_loader, test_loader, embeddings
 
 if __name__ == "__main__":
-    EMBEDDINGS_DIR = "/data/project/users/victoriawu/dinov3/dataset/"
+    EMBEDDINGS_DIR = "/data/project/users/victoriawu/dinov3/pca_embeddings_split/"
     METADATA_CSV = "data/view3_exams_patients_with_lvfp_doppler.csv"
     
     train_loader, val_loader, test_loader, embeddings = test_dataloader(
-        EMBEDDINGS_DIR, METADATA_CSV, batch_size=16, num_workers=4
+        EMBEDDINGS_DIR, METADATA_CSV, batch_size=16, num_workers=0
     )
 

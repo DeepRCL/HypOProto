@@ -101,6 +101,11 @@ class Hyper_Video_XProtoNet(Video_XProtoNet_EchoPrime):
         (_, distances, occurrence_map, logits, pred_radius) = self.forward_detailed(x)
         similarities = self.distance_2_similarity(distances)
         return logits, similarities, occurrence_map, pred_radius
+    
+    def get_hyper_video_features(self, x):
+        (feats, distances, _, _, _) = self.forward_detailed(x)
+        similarities = self.distance_2_similarity(distances)
+        return feats, similarities
 
     def distance_2_similarity(self, distances, max_distance=0):
         # TODO CHECK TO FIND WITH WHAT FORMULA THE HYPERBOLIC DISTANCE CAN BE CONVERTED TO SIMILARITY SCORE!
@@ -256,7 +261,7 @@ class Hyper_Video_XProtoNet(Video_XProtoNet_EchoPrime):
 
 
         # TODO check what should be returned!
-        if not self.lift_prototypes:
+        if self.lift_prototypes:
         #### if Option 1 is selected to not lift the prototypes, return the hyperbolic features!
             features_to_track = hyperbolic_feature_map  # shape (N, P, D)
         #### if Option 2 is selected to lift the prototypes, return the euclidean features!

@@ -229,7 +229,7 @@ def get_color_indices_selected_classes(num_classes, num_broads, selected_num_cla
     num_prototypes_per_class = num_prototypes // selected_num_classes  # Assumes even split
     
     # One unique color per selected class
-    class_colors = ['red', 'lime', 'orange', 'teal', 'navy', 'maroon', 'olive', 
+    class_colors = ['lime', 'red', 'orange', 'teal', 'navy', 'maroon', 'olive', 
                     'coral', 'gold', 'silver'][:selected_num_classes]
     
     # Repeat each class color for its prototypes
@@ -771,7 +771,7 @@ def plot_radius_vs_root_distance(root_distances, prototype_ee, title, epoch, mod
     fig, ax = plt.subplots(figsize=(8, 6))
     
     # X: centered radii (prototype_ee - 14)
-    x = prototype_ee - 14
+    x = prototype_ee #- 14
     
     # Y: root distances
     y = root_distances
@@ -783,7 +783,7 @@ def plot_radius_vs_root_distance(root_distances, prototype_ee, title, epoch, mod
     plt.colorbar(scatter, ax=ax, label='E/e\' ratio')
     
     # Labels & formatting
-    ax.set_xlabel("Prototype Radius - 14 (Centered E/e')")
+    ax.set_xlabel("E/e' value")
     ax.set_ylabel("Lorentz Distance to Origin")
     ax.set_title(f"{title}\nRadius vs Root Distance | Epoch: {epoch}")
     ax.grid(True, alpha=0.3)
@@ -797,12 +797,234 @@ def plot_radius_vs_root_distance(root_distances, prototype_ee, title, epoch, mod
     
     return fig
 
+def plot_hyperboloid_projection(pred_ee, true_ee, root_distances, title, epoch, model_root_dir, 
+                                 plot_name="pred_true_ee_distance", save_fig=True):
+    """
+    Simple scatter: x=pred E/e', y=root distance, color=true E/e'.
+    
+    Args:
+    - pred_ee, true_ee, root_distances: np.arrays (N,)
+    """
+    import matplotlib.pyplot as plt
+    
+    fig, ax = plt.subplots(figsize=(10, 7))
+    
+    # Scatter: x=pred, y=distance, c=true
+    scatter = ax.scatter(pred_ee, root_distances, 
+                         c=true_ee, s=60, cmap='gist_rainbow', alpha=0.5)
+    
+    # Labels
+    ax.set_xlabel('Predicted E/e\' ratio')
+    ax.set_ylabel('Lorentz Distance to Origin')
+    ax.set_title(f'{title} | Epoch {epoch}')
+    
+    # Colorbar = TRUE E/e'
+    plt.colorbar(scatter, label='True E/e\' ratio')
+    
+    # Grid
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    # Save
+    if save_fig:
+        plt.savefig(get_fig_path(model_root_dir, plot_name, epoch), 
+                   bbox_inches='tight', dpi=300)
+    
+    plt.show()
+    return fig
+
+# def plot_combined_hyperboloid_projection(
+#     video_pred_ee=None, video_true_ee=None, video_root_dists=None,
+#     proto_root_dists=None, proto_ee=None,
+#     title="Hyperboloid Projection: Videos + Prototypes", epoch=0, model_root_dir="",
+#     plot_name="combined-video-proto-hyper", save_fig=True
+# ):
+#     """
+#     Combined scatter: Videos (x=true_ee or pred_ee, y=root_dist, c=true_ee) 
+#     + Prototypes as stars (x=proto_ee, y=root_dist, c=proto_ee).
+    
+#     Args:
+#     - Video args: np.arrays (N,) for test videos [pass None to skip]
+#     - proto_root_dists: np.array(P,) prototype distances to origin
+#     - proto_ee: np.array(P,) prototype E/e' values
+#     - title, epoch, etc: same as before
+#     """
+#     import matplotlib.pyplot as plt
+#     import numpy as np
+    
+#     fig, ax = plt.subplots(figsize=(12, 8))
+    
+#     # Plot VIDEOS: x=true_ee (or pred_ee), y=root_dist, c=true_ee (plasma)
+#     if video_true_ee is not None and video_root_dists is not None:
+#         x_video = video_pred_ee if video_pred_ee is not None else video_true_ee
+#         scatter_video = ax.scatter(
+#             x_video, video_root_dists, 
+#             c=video_true_ee, s=40, cmap='plasma', alpha=0.6, 
+#             marker='o', linewidth=0.5,
+#             label='Test Videos'
+#         )
+#         plt.colorbar(scatter_video, ax=ax, label='Video True E/e\'', 
+#                     shrink=0.8, pad=0.02)
+    
+#     # Plot PROTOTYPES as stars: x=proto_ee, y=root_dist, c=proto_ee (RdYlBu_r)
+#     if proto_root_dists is not None and proto_ee is not None:
+#         scatter_proto = ax.scatter(
+#             proto_ee, proto_root_dists, 
+#             c=proto_ee, s=200, cmap='plasma', alpha=0.9, 
+#             marker='*', edgecolors='black', linewidth=1.5,
+#             label='Prototypes', zorder=10
+#         )
+#         plt.colorbar(scatter_proto, ax=ax, label='Proto E/e\'', 
+#                     shrink=0.8, pad=0.05)
+    
+#     # Labels & formatting
+#     ax.set_xlabel('E/e\' ratio')
+#     ax.set_ylabel('Lorentz Distance to Origin (tangent norm)')
+#     ax.set_title(f'{title} | Epoch {epoch}')
+#     ax.grid(True, alpha=0.3)
+#     if 'Test Videos' in ax.get_legend_handles_labels()[1]: 
+#         ax.legend(loc='upper right')
+    
+#     plt.tight_layout()
+    
+#     # Save
+#     if save_fig:
+#         plt.savefig(get_fig_path(model_root_dir, plot_name, epoch), 
+#                    bbox_inches='tight', dpi=300)
+    
+#     plt.show()
+#     return fig
+
+def plot_combined_hyperboloid_projection(
+    video_pred_ee=None, video_true_ee=None, video_root_dists=None,
+    proto_root_dists=None, proto_ee=None,
+    title="Hyperboloid Projection: Videos + Prototypes", epoch=0, model_root_dir="",
+    plot_name="combined-video-proto-hyper", save_fig=True
+):
+    """
+    Combined scatter: Videos + Prototypes with SHARED color scale (True/Proto E/e').
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Collect ALL E/e' values for unified color scale
+    all_ee_values = []
+    if video_true_ee is not None:
+        all_ee_values.extend(video_true_ee)
+    if proto_ee is not None:
+        all_ee_values.extend(proto_ee)
+    all_ee = np.array(all_ee_values)
+    # CLIPPED → FIXED 0-30 scale
+    all_ee = np.clip(all_ee, 0, 30)  # >=30 same color!
+    vmin, vmax = np.nanmin(all_ee), 30
+    
+    # Plot VIDEOS first (background layer)
+    if video_true_ee is not None and video_root_dists is not None:
+        x_video = video_pred_ee if video_pred_ee is not None else video_true_ee
+        scatter_video = ax.scatter(
+            x_video, video_root_dists, 
+            c=video_true_ee, s=40, cmap='gist_rainbow', alpha=0.6, 
+            marker='o', linewidth=0.5, vmin=vmin, vmax=vmax,
+            label='Test Videos', zorder=1
+        )
+    
+    # Plot PROTOTYPES as stars (foreground, same scale)
+    if proto_root_dists is not None and proto_ee is not None:
+        scatter_proto = ax.scatter(
+            proto_ee, proto_root_dists, 
+            c=proto_ee, s=350, cmap='gist_rainbow', alpha=1.0, 
+            marker='*', edgecolors='black', linewidth=2.0, 
+            vmin=vmin, vmax=vmax,  # Shared scale!
+            label='Prototypes', zorder=10
+        )
+    
+    # SINGLE shared colorbar (for both!)
+    if len(all_ee) > 0:
+        cbar = plt.colorbar(scatter_proto, ax=ax, label='True E/e\' ratio', 
+                           shrink=0.8, pad=0.02)
+        # Increase label font size
+        cbar.set_label(label='True E/e\' ratio', fontsize=14)
+        # Optional: Tick labels too
+        cbar.ax.tick_params(labelsize=11)
+    
+    # Labels & formatting
+    ax.set_xlabel('Predicted E/e\' ratio', fontsize=18)
+    ax.set_ylabel('Lorentz Distance to Origin (tangent norm)', fontsize=18)
+    ax.set_title(f'{title} | Epoch {epoch}', fontsize=18, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc='upper right', framealpha=0.9, fontsize=14, markerscale=1.3)
+    
+    plt.tight_layout()
+    
+    # Save
+    if save_fig:
+        plt.savefig(get_fig_path(model_root_dir, plot_name, epoch), 
+                   bbox_inches='tight', dpi=300)
+    
+    plt.show()
+    return fig
+
+def plot_radius_vs_root_distance_with_videos(root_distances, prototype_ee, 
+                                            video_ee_closest, video_distances_closest,
+                                            title, epoch, model_root_dir, 
+                                            plot_name="radius_vs_root_distance_videos", save_fig=True):
+    """
+    Original plot + 10 closest videos per prototype as small dots.
+    
+    Args:
+    - root_distances, prototype_ee: np.array(P,)
+    - video_ee_closest: list[P] of 10 closest video E/e' values per proto
+    - video_distances_closest: list[P] of 10 closest video distances per proto
+    """
+    fig, ax = plt.subplots(figsize=(10, 7))
+    
+    # 1. Prototypes (large, colored by E/e')
+    scatter_proto = ax.scatter(prototype_ee, root_distances, 
+                              c=prototype_ee, s=120, alpha=0.9, 
+                              cmap='RdYlBu_r', edgecolor='black', linewidth=1.5,
+                              label='Prototypes', zorder=10)
+    
+    # 2. 10 closest videos per prototype (small dots)
+    all_video_x, all_video_y, all_video_c = [], [], []
+    for p in range(len(prototype_ee)):
+        # Videos for proto p
+        vid_ee = video_ee_closest[p]
+        vid_dist = video_distances_closest[p]
+        
+        all_video_x.extend(vid_ee)
+        all_video_y.extend(vid_dist)
+        all_video_c.extend([prototype_ee[p]] * len(vid_ee))  # Color by proto E/e'
+    
+    scatter_videos = ax.scatter(all_video_x, all_video_y, 
+                               c=all_video_c, s=20, alpha=0.6, 
+                               cmap='RdYlBu_r', edgecolor='none',
+                               label='10 closest videos/proto', zorder=5)
+    
+    # Formatting
+    plt.colorbar(scatter_proto, ax=ax, label='Prototype E/e\' ratio')
+    ax.set_xlabel("E/e' value")
+    ax.set_ylabel("Lorentz Distance to Origin")
+    ax.set_title(f"{title}\nPrototypes + 10 Closest Videos | Epoch: {epoch}")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # Save
+    if save_fig:
+        plt.savefig(get_fig_path(model_root_dir, plot_name, epoch), 
+                   bbox_inches='tight', dpi=300)
+    
+    return fig
+
 
 # Example Usage (replace with your actual values)
 if __name__ == '__main__':
-    model_runname = 'Hyper_MAE_0.2_HyperPAS_0.5_00'
+    model_runname = 'Hyper_Proto_Dino_512_Push_at_20_2_00'
     model_root_dir = f"logs/{model_runname}"  # Replace with your model directory
-    epoch_num = 50
+    epoch_num = 25
 
     emb_class_names = ['Normal', 'Elevated']
 

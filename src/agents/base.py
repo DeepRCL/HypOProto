@@ -17,7 +17,7 @@ from src.models import model_builder
 from src.utils.utils import print_cuda_statistics
 from src.data.dataloader import create_video_dataloaders
 from src.data.echoprime_dataloader import create_echoprime_dataloaders
-from src.data.dino_dataloader import create_dino_dataloaders
+from src.data.dino_dataloader_local import create_dino_dataloaders
 
 cudnn.benchmark = True  # IF input size is same all the time, it's faster this way
 
@@ -61,10 +61,17 @@ class BaseAgent:
         # }
         
         if "dino" in config['run_name'].lower():
-            self.data_loaders: Dict[str, DataLoader] = dict(zip(
-                ["train", "val", "test"], 
-                create_dino_dataloaders(config)  # Returns (train, val, test)
-            ))
+            # memmap_files = [f"/data/project/users/victoriawu/dinov3/shards_new/{i}_memmap.dat" for i in range(1, 24)]
+            # index_files  = [f"/data/project/users/victoriawu/dinov3/shards_new/{i}_index.pkl" for i in range(1, 24)] 
+            # train_loader, val_loader, test_loader = create_dino_dataloaders(config, memmap_files, index_files)
+            train_loader, val_loader, test_loader = create_dino_dataloaders(config)
+
+            self.data_loaders = {
+                "train": train_loader,
+                "val": val_loader,
+                "test": test_loader,
+                "train_push": train_loader,  # reuse, no second creation
+            }
         elif config['model']['name'] == "ProtoFPNet_Video_EchoPrime" or config['model']['name'] == "Hyper_ProtoFPNet_Video_EchoPrime":
             self.data_loaders: Dict[str, DataLoader] = dict(zip(
                 ["train", "val", "test"], 

@@ -59,11 +59,26 @@ if __name__ == "__main__":
     agent = agent_class(config)
 
     # ############# Run the system ###############
-    if config["eval_only"]:
+    if config["eval_dfr_only"]:
+        # NEW: Eval DFR model only (no training)
+        agent.load_checkpoint(config['pretrained_checkpoint'])  # Loads DFR-enabled model
+        agent.run_epoch(0, mode=config["eval_data_type"])  # Uses DFR head
+    elif config["dfr_only"]:
+        # NEW: DFR-only mode - load pretrained + apply DFR
+        pretrained_ckpt = config.get('pretrained_checkpoint', None)
+        if pretrained_ckpt:
+            agent.apply_dfr_from_checkpoint(pretrained_ckpt)
+            agent.save_model(config['save_dir'], "model_dfr.pth")
+            logging.info("✅ DFR applied & saved!")
+        else:
+            logging.error("dfr_only requires pretrained_checkpoint in config")
+        agent.run_epoch(0, mode='test')
+    elif config["eval_only"]:
         agent.evaluate(mode=config["eval_data_type"])
     elif config["push_only"]:
         agent.push(replace_prototypes=False)
     else:
+        # Normal training (DFR auto-trains on first val if enabled)
         agent.run()
 
     agent.finalize()
