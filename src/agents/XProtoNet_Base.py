@@ -28,7 +28,7 @@ from src.loss.loss import (
     TransformLoss,
     CeLossAbstain,
 )
-from src.utils import push_abs_revision, local_explainability, global_explainability
+from src.utils import push_abs_revision, local_explainability
 from src.utils.vis_prot_embd_space import visualize_prototype_embedding_space
 from src.data.dataloader import class_labels
 
@@ -727,23 +727,6 @@ class XProtoNet_Base(ProtoPNet_Base):
             # if not None, explainability results will be saved here
             epoch_number=epoch,
         )
-
-    def explain_global(self, mode="val"):
-        """
-        Global explanation of prototypes
-        :param mode: dataset to select (test or val)
-        """
-        pass
-        # epoch = self.current_epoch
-        # global_explainability.explain_global(
-        #     mode=mode,  # val or test
-        #     dataloader=self.data_loaders[mode],  # pytorch dataloader (must be unnormalized in [0,1])
-        #     model=self.model,  # pytorch network with prototype_vectors
-        #     preprocess_input_function=None,  # normalize if needed
-        #     model_directory=self.config["save_dir"],
-        #     # if not None, explainability results will be saved here
-        #     epoch_number=epoch,
-        # )
 
     def log_lr(self, epoch_log_dict):
         epoch_log_dict.update(

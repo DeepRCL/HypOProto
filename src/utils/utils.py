@@ -45,11 +45,6 @@ def updated_config() -> Dict[str, Any]:
         help="Locally explains cases from eval_data_type split",
     )
     initial_parser.add_argument(
-        "--explain_globally",
-        default=False,
-        help="Globally explains the learnt prototypes from the eval_data_type split",
-    )
-    initial_parser.add_argument(
         "-l",
         "--log_level",
         type=str,
@@ -74,7 +69,6 @@ def updated_config() -> Dict[str, Any]:
     config["eval_data_type"] = args.eval_data_type
     config["push_only"] = args.push_only
     config["explain_locally"] = args.explain_locally
-    config["explain_globally"] = args.explain_globally
     config["log_level"] = args.log_level
     config["comment"] = args.comment
 
@@ -174,8 +168,6 @@ def create_save_loc(config):
         config_path = os.path.join(config_dir, "push_config.yml")
     elif config["explain_locally"]:
         config_path = os.path.join(config_dir, "explain_locally_config.yml")
-    elif config["explain_globally"]:
-        config_path = os.path.join(config_dir, "explain_globally_config.yml")
     else:
         config_path = os.path.join(config_dir, "train_config.yml")
     with open(config_path, "w") as outfile:

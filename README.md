@@ -10,7 +10,6 @@ Official repository for the paper:
 - [Introduction](#Introduction)
 - [Environment Setup](#Environment-Setup)
 - [Train and Test](#Train-and-Test)
-- [Local Explanation](#Local-Explanation)
 - [Description of Files and Folders](#Description-of-Files-and-Folders)
 - [Acknowledgement](#Acknowledgement)
 - [Citation](#Citation)
@@ -75,12 +74,6 @@ Examples for model checkpoint path:
   - `python main.py --config_path="src/configs/Ours_ProtoASNet_Video.yml" --run_name="ProtoASNet_test_run" --save_dir="logs/ProtoASNet/VideoBased_testrun_00" --model.checkpoint_path="logs/ProtoASNet/VideoBased_testrun_00/last.pth"`
   This bash command runs the last checkpoint saved in `VideoBased_testrun_00` folder.
 
-**Note: You can find the training/testing commands with finalized hyper-parameters and yaml config files for the models reported in the MICCAI 2023 paper (both our models and baselines) in the `MICCAI2023_ProtoASNet_Deploy.sh` script.** 
-
-```bash
-bash MICCAI2023_ProtoASNet_Deploy.sh
-```
-
 ### outputs 
 
 the important content saved in save_dir folder are:
@@ -102,23 +95,6 @@ the important content saved in save_dir folder are:
     - `prototypes_occurrence_maps`: occurence map correpsonding to each prototype (where the model looks at for each prototype)
     - `prototypes_similarity_to_src_ROIs`: similarity score of the prototype vector before projection to the ROI it is projected to,
 
-------------------------------------------------------------------------------
-## Local Explanation
-You can run the local exlanation to explain a given image locally by showing how similar it is to the learnt prototypes
-and how the model made its decision to classify the image as such.
-
-To explain all the data in validation or test set, run the command bellow:
-
-```bash
-python explain.py --explain_locally=True --eval_data_type='val' --config_path="src/configs/<your config>.yml" --run_name="LocalExplain_<your name>"  --wandb_mode="disabled" --save_dir="logs/<your run name>" --model.checkpoint_path="logs/<your run name>/model_best.pth"
-```
- 
-outputs are stored in folder `/path/to/saved/checkpoint/epoch_<##>/val` with this format:
-
-- `local/filename/test_clip_AS-<AsLabel>.MP4`: showing the input echo video 
-- `local/filename/AS-<AsLable>_<sim_score>_<prototype#>.png`
-
-
 --------------------------------------------------------------------------------------------------------
 ## Description of files and folders
 
@@ -134,7 +110,7 @@ When training is done for the first time, pretrained backbone models are saved h
 - `data/`: folder for dataset and dataloader classes
 - `loss/`: folder for loss functions
 - `models/`: folders for model architectures
-- `utils/`: folder for some utility scripts and local explanation 
+- `utils/`: folder for some utility scripts
 
 --------------------------------------------------------------------------------------------------------
 ## Acknowledgement

@@ -47,7 +47,5 @@ if __name__ == "__main__":
 
     if config["explain_locally"]:
         agent.explain_local(mode=config["eval_data_type"])
-    elif config["explain_globally"]:
-        agent.explain_global(mode=config["eval_data_type"])
 
     agent.finalize()
