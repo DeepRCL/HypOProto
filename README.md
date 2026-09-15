@@ -1,12 +1,9 @@
-# ProtoASNet
+# HypOProto
 Official repository for the paper:
 
-> **ProtoASNet: Dynamic Prototypes for Inherently Interpretable and Uncertainty-Aware Aortic Stenosis Classification in Echocardiography**              
-> Hooman Vaseli*, Ang Nan Gu*, S. Neda Ahmadi Amiri*, Michael Y. Tsang*, Andrea Fung, Nima Kondori, Armin Saadat, Purang Abolmaesumi, Teresa S. M. Tsang </br>
-> (*Equal Contribution) </br> 
-> **Published in MICCAI 2023** </br> 
-> [Springer Link](https://link.springer.com/chapter/10.1007/978-3-031-43987-2_36) </br> 
-> [arXiv Link](https://arxiv.org/abs/2307.14433) 
+> **HypOProto: Hyperbolic Ordinal Prototypes for Left Ventricular Filling Pressure Classification**              
+> Victoria Wu, Nima Hashemi, Hooman Vaseli, Christina Luong, Purang Abolmaesumi, Teresa S. M. Tsang </br>
+> [arXiv Link](https://arxiv.org/abs/2606.19804) 
 
 --------------------------------------------------------------------------------------------------------
 ## Contents
@@ -21,10 +18,16 @@ Official repository for the paper:
 
 ## Introduction 
 
-This work has the aim to detect severity of Aortic Stenosis (AS) in B-Mode echo of 
-Parasternal Long and Short axes (PLAX and PSAX) views. 
+This work aims to classify Left Ventricular Filling Pressure (LVFP) into normal vs. elevated
+categories directly from echocardiography video, without relying on the Doppler-derived E/e'
+ratio used in standard clinical practice, which is operator-dependent and often unavailable in
+resource-limited settings.
+
+HypOProto arranges learned prototypes in hyperbolic space along physiological scales, placing
+borderline cases near the hyperboloid root and clearer diagnostic cases further outward, trained
+with a Hyperbolic Prototype Angular Separation (HyperPAS) loss. This is, to our knowledge, the
+first prototype-based interpretable framework applied to LVFP classification.
 Due to privacy issues, we cannot share the private dataset on which we experimented on.
-We also experimentd on the [TMED-2 public dataset](https://tmed.cs.tufts.edu/tmed_v2.html), however that would be only for the image-based models.  
 
 
 --------------------------------------------------------------------------------------------------------
@@ -33,10 +36,10 @@ We also experimentd on the [TMED-2 public dataset](https://tmed.cs.tufts.edu/tme
 1. Clone the repo
 
 ```bash
-git clone https://github.com/hooman007/ProtoASNet.git
-cd ProtoASNet
+git clone https://github.com/DeepRCL/HypOProto.git
+cd HypOProto
 ```
-2. place your data in the `data` folder. For TMED or your private dataset, you need to prepare your own dataset class. The existing code in `src/data/` may be useful for your reference.  
+2. place your data in the `data` folder. For your private dataset, you need to prepare your own dataset class. The existing code in `src/data/` may be useful for your reference.  
 
 3. If using Docker, it can be setup by running `docker_setup.sh` on your server. Change the parameters according to your needs:
    1. the name of the container `--name=your_container_name`  \
@@ -137,23 +140,23 @@ When training is done for the first time, pretrained backbone models are saved h
 ## Acknowledgement
 
 Some code is borrowed from [ProtoPNet](https://github.com/cfchen-duke/ProtoPNet), 
-and we developed XprotoNet architecture based on their [paper](https://arxiv.org/abs/2103.10663), 
+and we developed XprotoNet architecture based on their [paper](https://arxiv.org/abs/2103.10663).
+This repository builds on our prior work, [ProtoASNet](https://github.com/hooman007/ProtoASNet)
+(published at MICCAI 2023), which introduced dynamic prototypes for uncertainty-aware Aortic
+Stenosis classification.
 
 --------------------------------------------------------------------------------------------------------
 
 ## Citation
 If you find this work useful in your research, please cite:
 ```
-@InProceedings{10.1007/978-3-031-43987-2_36,
-author="Vaseli, Hooman and Gu, Ang Nan and Ahmadi Amiri, S. Neda and Tsang, Michael Y. and Fung, Andrea and Kondori, Nima and Saadat, Armin and Abolmaesumi, Purang and Tsang, Teresa S. M.",
-editor="Greenspan, Hayit and Madabhushi, Anant and Mousavi, Parvin and Salcudean, Septimiu
-and Duncan, James and Syeda-Mahmood, Tanveer and Taylor, Russell",
-title="ProtoASNet: Dynamic Prototypes for Inherently Interpretable and Uncertainty-Aware Aortic Stenosis Classification in Echocardiography",
-booktitle="Medical Image Computing and Computer Assisted Intervention -- MICCAI 2023",
-year="2023",
-publisher="Springer Nature Switzerland",
-address="Cham",
-pages="368--378",
-isbn="978-3-031-43987-2"
+@misc{wu2026hypoprotohyperbolicordinalprototypes,
+      title={HypOProto: Hyperbolic Ordinal Prototypes for Left Ventricular Filling Pressure Classification}, 
+      author={Victoria Wu and Nima Hashemi and Hooman Vaseli and Christina Luong and Purang Abolmaesumi and Teresa S. M. Tsang},
+      year={2026},
+      eprint={2606.19804},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2606.19804}, 
 }
 ```
